@@ -288,6 +288,7 @@
         let bridgeToken = '';
         let manageReady = false;
         let editingRow = null;
+        let studyNeedsRefresh = false;
 
         // --- Duplicate detection (per current deck) ---
         let duplicateCounts = null;
@@ -478,14 +479,15 @@
             back.textContent  = "";
             return;
           }
-          const urlTSV = `${PUBLISH_URL}?gid=${gid}&single=true&output=tsv`;
-          const urlCSV = `${PUBLISH_URL}?gid=${gid}&single=true&output=csv`;
+          const fresh = Date.now();
+          const urlTSV = `${PUBLISH_URL}?gid=${gid}&single=true&output=tsv&_=${fresh}`;
+          const urlCSV = `${PUBLISH_URL}?gid=${gid}&single=true&output=csv&_=${fresh}`;
           console.log('[Load] Trying TSV:', urlTSV);
-          fetch(urlTSV)
+          fetch(urlTSV, { cache: 'no-store' })
             .then(r => r.ok ? r.text() : Promise.reject(new Error('TSV not ok')))
             .catch(() => {
               console.warn('[Load] TSV failed, trying CSV:', urlCSV);
-              return fetch(urlCSV).then(r => {
+              return fetch(urlCSV, { cache: 'no-store' }).then(r => {
                 if (!r.ok) throw new Error('CSV not ok');
                 return r.text();
               });
@@ -691,6 +693,14 @@
           if (!showStudy && !manageReady) {
             initializeManageView();
           }
+
+          if (showStudy && studyNeedsRefresh) {
+            const gid = dropdown.selectedOptions[0]?.dataset?.gid;
+            if (gid) {
+              studyNeedsRefresh = false;
+              loadByGid(gid);
+            }
+          }
         }
 
         async function initializeManageView() {
@@ -795,6 +805,7 @@
                   sheet: manageDaySelector.value,
                   row: entry.row
                 });
+                studyNeedsRefresh = true;
                 resetEntryForm();
                 setManageStatus('Vocabulary deleted.', 'success');
                 await loadManageEntries();
@@ -843,6 +854,7 @@
 
           try {
             await bridgeRequest(payload);
+            studyNeedsRefresh = true;
             resetEntryForm();
             setManageStatus(
               action === 'add' ? 'Vocabulary added.' : 'Changes saved.',
