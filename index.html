@@ -114,6 +114,16 @@
     .setup-warning {
       padding:12px; border:1px solid #e3b341; border-radius:10px; background:#fff8df;
     }
+    .setup-warning p { margin-top:0; }
+    .setup-connect { display:flex; gap:8px; flex-wrap:wrap; }
+    .setup-connect input {
+      flex:1 1 220px; min-width:0; padding:10px 12px; border:1px solid #aaa;
+      border-radius:9px; font:inherit; background:#fff;
+    }
+    .setup-connect button {
+      padding:10px 14px; border:1px solid #24613b; border-radius:9px;
+      background:#24613b; color:#fff; font-weight:700; cursor:pointer;
+    }
     .sr-only {
       position:absolute;
       left:-9999px;
@@ -194,7 +204,12 @@
         <p class="manage-note">Vocabulary is saved to the selected Day. The A-Z Word Bank is updated automatically.</p>
 
         <div id="bridgeSetupWarning" class="setup-warning" hidden>
-          This device has not been connected yet. Please use the setup link provided by Select.
+          <p id="bridgeSetupMessage">This device has not been connected yet.</p>
+          <div class="setup-connect">
+            <label class="sr-only" for="bridgeTokenInput">Connection code</label>
+            <input id="bridgeTokenInput" type="password" placeholder="Connection code" autocomplete="off">
+            <button id="connectBridgeBtn" type="button">Connect This Device</button>
+          </div>
         </div>
 
         <div id="manageControls">
@@ -273,6 +288,9 @@
         const studyView = document.getElementById('studyView');
         const manageView = document.getElementById('manageView');
         const bridgeSetupWarning = document.getElementById('bridgeSetupWarning');
+        const bridgeSetupMessage = document.getElementById('bridgeSetupMessage');
+        const bridgeTokenInput = document.getElementById('bridgeTokenInput');
+        const connectBridgeBtn = document.getElementById('connectBridgeBtn');
         const manageControls = document.getElementById('manageControls');
         const manageDaySelector = document.getElementById('manageDaySelector');
         const entryForm = document.getElementById('entryForm');
@@ -663,10 +681,22 @@
           const data = await response.json();
 
           if (!data.ok) {
+            if (/unauthorized/i.test(data.error || '')) {
+              localStorage.removeItem(BRIDGE_TOKEN_KEY);
+              bridgeToken = '';
+              manageReady = false;
+              showBridgeSetup('The saved connection has expired. Enter the current connection code.');
+            }
             throw new Error(data.error || 'The request could not be completed.');
           }
 
           return data;
+        }
+
+        function showBridgeSetup(message) {
+          bridgeSetupMessage.textContent = message || 'This device has not been connected yet.';
+          bridgeSetupWarning.hidden = false;
+          manageControls.hidden = true;
         }
 
         function setManageStatus(message, type = '') {
@@ -705,8 +735,7 @@
 
         async function initializeManageView() {
           if (!bridgeToken) {
-            bridgeSetupWarning.hidden = false;
-            manageControls.hidden = true;
+            showBridgeSetup('Enter the connection code provided by Select.');
             return;
           }
 
@@ -736,6 +765,21 @@
             setManageStatus(error.message, 'error');
           }
         }
+
+        connectBridgeBtn.addEventListener('click', async () => {
+          const token = bridgeTokenInput.value.trim();
+
+          if (!token) {
+            bridgeSetupMessage.textContent = 'Please enter the connection code.';
+            return;
+          }
+
+          bridgeToken = token;
+          localStorage.setItem(BRIDGE_TOKEN_KEY, token);
+          bridgeTokenInput.value = '';
+          manageReady = false;
+          await initializeManageView();
+        });
 
         async function loadManageEntries() {
           const sheet = manageDaySelector.value;
