@@ -254,7 +254,7 @@
         const BRIDGE_URL    = 'https://script.google.com/macros/s/AKfycbxB28LLOpkHCAZgLoJGGgPwJJhpTc7oMdRyIN8xGWVpk0Sa5vWJ2P1WIAuKNy5Ky9aN0w/exec';
 
         // Allow-list
-        let courseDays = 24; // Fallback; the bridge supplies the administrative limit.
+        let courseDays = 0; // Safe fallback; the bridge supplies the administrative limit.
         const EXTRA_TABS = ["A-Z Word Bank", "Everyday Phrasal Verbs", "Business Phrasal Verbs", "Proverbs"];
         const isAllowedStudySheet = (name) => {
           const match = name.match(/^Day\s+(\d+)$/i);
@@ -659,11 +659,18 @@
             const response = await fetch(BRIDGE_URL, { cache: 'no-store' });
             const data = await response.json();
 
-            if (data.ok && Number.isInteger(Number(data.maxAccessibleDay))) {
-              courseDays = Number(data.maxAccessibleDay);
+            const maxAccessibleDay = Number(data.maxAccessibleDay);
+
+            if (
+              data.ok &&
+              Number.isInteger(maxAccessibleDay) &&
+              maxAccessibleDay >= 1 &&
+              maxAccessibleDay <= 100
+            ) {
+              courseDays = maxAccessibleDay;
             }
           } catch (error) {
-            console.warn('[Bridge] Status unavailable; using fallback Day limit.', error);
+            console.warn('[Bridge] Status unavailable; Day access remains locked.', error);
           }
         }
 
